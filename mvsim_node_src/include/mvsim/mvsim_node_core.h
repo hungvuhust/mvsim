@@ -42,8 +42,6 @@
 #include <rosgraph_msgs/Clock.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <std_msgs/Bool.h>
-#include <tf2/LinearMath/Transform.h>
-#include <tf2_msgs/TFMessage.h>
 #include <visualization_msgs/MarkerArray.h>
 
 // usings:
@@ -59,7 +57,6 @@ using Msg_OccupancyGrid = nav_msgs::OccupancyGrid;
 using Msg_Odometry = nav_msgs::Odometry;
 using Msg_MapMetaData = nav_msgs::MapMetaData;
 using Msg_Bool = std_msgs::Bool;
-using Msg_TFMessage = tf2_msgs::TFMessage;
 using Msg_MarkerArray = visualization_msgs::MarkerArray;
 using Msg_CameraInfo = sensor_msgs::CameraInfo;
 #else
@@ -76,8 +73,6 @@ using Msg_CameraInfo = sensor_msgs::CameraInfo;
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float64.hpp>
-#include <tf2/LinearMath/Transform.hpp>
-#include <tf2_msgs/msg/tf_message.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "wrapper/publisher_wrapper.h"
@@ -96,7 +91,6 @@ using Msg_Odometry = nav_msgs::msg::Odometry;
 using Msg_MapMetaData = nav_msgs::msg::MapMetaData;
 using Msg_Bool = std_msgs::msg::Bool;
 using Msg_Float64 = std_msgs::msg::Float64;
-using Msg_TFMessage = tf2_msgs::msg::TFMessage;
 using Msg_MarkerArray = visualization_msgs::msg::MarkerArray;
 using Msg_CameraInfo = sensor_msgs::msg::CameraInfo;
 #endif
@@ -236,9 +230,6 @@ class MVSimNode
 		mvsim_node::shared_ptr<ros::Publisher> pub_chassis_shape;  //!< "<VEH>/chassis_shape"
 		mvsim_node::shared_ptr<ros::Publisher> pub_collision;  //!< "<VEH>/collision"
 
-		mvsim_node::shared_ptr<ros::Publisher> pub_tf;	//!< "<VEH>/tf"
-		mvsim_node::shared_ptr<ros::Publisher> pub_tf_static;  //!< "<VEH>/tf_static"
-
 		Msg_MarkerArray chassis_shape_msg;
 #else
 		/// Subscribers vehicle's "cmd_vel" topic
@@ -262,10 +253,6 @@ class MVSimNode
 		rclcpp::Publisher<Msg_Polygon>::SharedPtr pub_chassis_shape;
 		/// "<VEH>/collision"
 		rclcpp::Publisher<Msg_Bool>::SharedPtr pub_collision;
-
-		/// "<VEH>/tf", "<VEH>/tf_static"
-		rclcpp::Publisher<Msg_TFMessage>::SharedPtr pub_tf;
-		rclcpp::Publisher<Msg_TFMessage>::SharedPtr pub_tf_static;
 
 		Msg_MarkerArray chassis_shape_msg;
 
@@ -301,9 +288,6 @@ class MVSimNode
 	// ros_Time sim_time_;	 //!< Current simulation time
 	ros_Time base_last_cmd_;  //!< received a vel_cmd (for watchdog)
 	ros_Duration base_watchdog_timeout_ = ros_Duration(1, 0);
-
-	/// Unit transform (const, once)
-	const tf2::Transform tfIdentity_ = tf2::Transform::getIdentity();
 
 	struct TThreadParams
 	{

@@ -1,11 +1,8 @@
 <!--
-  Vehicle class definition file.
-  Intended to be included into world XML files.
-  Common sensors could be included here, but they are left to be included in 
-  class instantiations.
-  Refer to mvsim_tutorial example files.
+  Vehicle class definition file cho jackal với chỉ pointcloud và IMU
+  Không có camera, chỉ có lidar3d (pointcloud) và IMU
 -->
-<vehicle:class name="jackal">
+<vehicle:class name="jackal_livox">
 
   <!--  Dynamical model -->
   <dynamics class="differential_4_wheels">
@@ -56,7 +53,6 @@
   <!-- Noisy odometry parameters. These are multipliers to actual SE(2) increments -->
   <odometry x_multiplier="$f{1.0+0.02*randn()}" y_multiplier="$f{1.0+0.01*randn()}" yaw_multiplier="$f{1.0+0.03*randn()}" />
 
-
   <!--  Custom visualization model -->
   <!-- 3D model filename to load (local or remote http://uri ) -->
   <visual>
@@ -66,9 +62,11 @@
     <model_roll>90.0</model_roll>
   </visual>
 
+  <!-- Sensors: chỉ có pointcloud và IMU -->
+  <!-- Pointcloud sensor (Livox lidar) - đặt tại vị trí livox_frame -->
+  <include file="../mvsim_tutorial/livox_lidar.sensor.xml" sensor_x="-0.07" sensor_y="0.0" sensor_z="0.337" sensor_yaw="0" sensor_pitch="180.0" sensor_roll="0" sensor_std_noise="0.0025" sensor_publish="false" sensor_name="lidar" sensor_rate="10.0" generate_intensity="true" horz_resolution_factor="1.5" vert_resolution_factor="1.0" />
 
-  <if condition="${default_sensors|true}">
-    <include file="helios-32-FOV-31.sensor.xml" sensor_x="0.15" sensor_z="$f{0.27 + 0.08}" sensor_std_noise="0.0025" sensor_publish="false" sensor_name="livox" sensor_rate="10.0" generate_intensity="true" horz_resolution_factor="1.5" vert_resolution_factor="1.0" />
-  </if>
+  <!-- IMU sensor - offset từ lidar theo T_lidar_imu=[0.006,-0.012,0.008] (converted to base_link frame) -->
+  <include file="../mvsim_tutorial/livox_imu.sensor.xml" sensor_x="-0.076" sensor_y="-0.012" sensor_z="0.329" sensor_yaw="0" sensor_pitch="180.0" sensor_roll="0" sensor_period_sec="0.005" sensor_name="imu" sensor_angular_velocity_white_noise_std_noise="2e-4" sensor_linear_acceleration_white_noise_std_noise="0.017" sensor_measure_orientation="true" />
 
 </vehicle:class>

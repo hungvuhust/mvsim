@@ -18,7 +18,8 @@ class PublisherWrapper : public PublisherWrapperBase
 {
    public:
 	PublisherWrapper(rclcpp::Node::SharedPtr node, const std::string& topic_name, size_t qos)
-		: publisher_(node->create_publisher<MessageT>(topic_name, qos))
+		: publisher_(
+			  node->create_publisher<MessageT>(topic_name, rclcpp::SensorDataQoS().keep_last(qos)))
 	{
 	}
 

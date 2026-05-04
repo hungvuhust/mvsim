@@ -39,15 +39,12 @@
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
 // usings:
 using ros::ok;
 
 using Msg_Header = std_msgs::Header;
 
 using Msg_Pose = geometry_msgs::Pose;
-using Msg_TransformStamped = geometry_msgs::TransformStamped;
 
 using Msg_GPS = sensor_msgs::NavSatFix;
 using Msg_Image = sensor_msgs::Image;
@@ -73,22 +70,12 @@ using Msg_Marker = visualization_msgs::Marker;
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
-// see: https://github.com/ros2/geometry2/pull/416
-#if defined(MVSIM_HAS_TF2_GEOMETRY_MSGS_HPP)
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#else
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#endif
-
-#include <tf2_ros/qos.hpp>	// DynamicBroadcasterQoS(), etc.
-
 // usings:
 using rclcpp::ok;
 
 using Msg_Header = std_msgs::msg::Header;
 
 using Msg_Pose = geometry_msgs::msg::Pose;
-using Msg_TransformStamped = geometry_msgs::msg::TransformStamped;
 
 using Msg_GPS = sensor_msgs::msg::NavSatFix;
 using Msg_Image = sensor_msgs::msg::Image;
@@ -356,11 +343,17 @@ void MVSimNode::spin()
 	{
 		return;
 	}
-	// Simulate:
-	mvsim_world_->run_simulation(incr_time);
 
-	// t_old_simul = world.get_simul_time();
-	t_old_ = t_new;
+	// Simulate only in multiples of simul_timestep, carry over the remainder:
+	const double simStep = mvsim_world_->get_simul_timestep();
+	const int nSteps = static_cast<int>(incr_time / simStep);
+	const double simulated_time = nSteps * simStep;
+
+	mvsim_world_->run_simulation(simulated_time);
+
+	// Only advance t_old_ by the time actually simulated, so the
+	// remainder accumulates for the next spin call:
+	t_old_ += simulated_time / realtime_factor_;
 
 	const auto& vehs = mvsim_world_->getListOfVehicles();
 
@@ -624,11 +617,6 @@ void MVSimNode::initPubSubs(TPubSubPerVehicle& pubsubs, mvsim::VehicleBase* veh)
 	pubsubs.pub_collision = mvsim_node::make_shared<ros::Publisher>(
 		n_.advertise<Msg_Bool>(vehVarName("collision", *veh), publisher_history_len_));
 
-	// pub: <VEH>/tf, <VEH>/tf_static
-	pubsubs.pub_tf = mvsim_node::make_shared<ros::Publisher>(
-		n_.advertise<Msg_TFMessage>(vehVarName("tf", *veh), publisher_history_len_));
-	pubsubs.pub_tf_static = mvsim_node::make_shared<ros::Publisher>(
-		n_.advertise<Msg_TFMessage>(vehVarName("tf_static", *veh), publisher_history_len_));
 #else
 	// pub: <VEH>/odom
 	pubsubs.pub_odom =
@@ -642,13 +630,6 @@ void MVSimNode::initPubSubs(TPubSubPerVehicle& pubsubs, mvsim::VehicleBase* veh)
 	pubsubs.pub_collision =
 		n_->create_publisher<Msg_Bool>(vehVarName("collision", *veh), publisher_history_len_);
 
-	// pub: <VEH>/tf, <VEH>/tf_static
-	const auto qos = tf2_ros::DynamicBroadcasterQoS();
-	const auto qos_static = tf2_ros::StaticBroadcasterQoS();
-
-	pubsubs.pub_tf = n_->create_publisher<Msg_TFMessage>(vehVarName("tf", *veh), qos);
-	pubsubs.pub_tf_static =
-		n_->create_publisher<Msg_TFMessage>(vehVarName("tf_static", *veh), qos_static);
 #endif
 
 	// pub: <VEH>/chassis_markers
@@ -790,16 +771,6 @@ void MVSimNode::initPubSubs(TPubSubPerVehicle& pubsubs, mvsim::VehicleBase* veh)
 #endif
 	}
 
-	// TF STATIC(namespace <Ri>): /base_link -> /base_footprint
-	Msg_TransformStamped tx;
-	tx.header.frame_id = "base_link";
-	tx.child_frame_id = "base_footprint";
-	tx.header.stamp = myNow();
-	tx.transform = tf2::toMsg(tfIdentity_);
-
-	Msg_TFMessage tfMsg;
-	tfMsg.transforms.push_back(tx);
-	pubsubs.pub_tf_static->publish(tfMsg);
 }
 
 void MVSimNode::onROSMsgCmdVel(Msg_Twist_CSPtr cmd, mvsim::VehicleBase* veh)
@@ -902,20 +873,6 @@ void MVSimNode::spinNotifyROS()
 						currentPos.pose.pose = gtOdoMsg.pose.pose;
 						pubs.pub_amcl_pose->publish(currentPos);
 					}
-
-					// TF(namespace <Ri>): /map -> /odom
-					{
-						Msg_TransformStamped tx;
-						tx.header.frame_id = "map";
-						tx.child_frame_id = "odom";
-						tx.header.stamp =
-							myNow() + std::chrono::milliseconds(50);  // Fix deay Fernando
-						tx.transform = tf2::toMsg(tf2::Transform::getIdentity());
-
-						Msg_TFMessage tfMsg;
-						tfMsg.transforms.push_back(tx);
-						pubs.pub_tf->publish(tfMsg);
-					}
 				}
 			}
 
@@ -947,20 +904,6 @@ void MVSimNode::spinNotifyROS()
 			// 3) odometry transform
 			// --------------------------------------------
 			{
-				// TF(namespace <Ri>): /odom -> /base_link
-				if (publish_tf_odom2baselink_)
-				{
-					Msg_TransformStamped tx;
-					tx.header.frame_id = "odom";
-					tx.child_frame_id = "base_link";
-					tx.header.stamp = myNow();
-					tx.transform = tf2::toMsg(mrpt2ros::toROS_tfTransform(veh_odom_pose));
-
-					Msg_TFMessage tfMsg;
-					tfMsg.transforms.push_back(tx);
-					pubs.pub_tf->publish(tfMsg);
-				}
-
 				// Apart from TF, publish to the "odom" topic as well
 				{
 					Msg_Odometry odoMsg;
@@ -1173,20 +1116,6 @@ void MVSimNode::internalOn(
 	}
 	lck.unlock();
 
-	// Send TF:
-	mrpt::poses::CPose3D sensorPose = obs.sensorPose;
-	auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-	Msg_TransformStamped tfStmp;
-	tfStmp.transform = tf2::toMsg(transform);
-	tfStmp.header.frame_id = "base_link";
-	tfStmp.child_frame_id = obs.sensorLabel;
-	tfStmp.header.stamp = myNow();
-
-	Msg_TFMessage tfMsg;
-	tfMsg.transforms.push_back(tfStmp);
-	pubs.pub_tf->publish(tfMsg);
-
 	// Send observation:
 	{
 		// Convert observation MRPT -> ROS
@@ -1216,24 +1145,10 @@ void MVSimNode::internalOn(const mvsim::VehicleBase& veh, const mrpt::obs::CObse
 			n_.advertise<Msg_Imu>(vehVarName(obs.sensorLabel, veh), publisher_history_len_));
 #else
 		pub = mvsim_node::make_shared<PublisherWrapper<Msg_Imu>>(
-			n_, vehVarName(obs.sensorLabel, veh), publisher_history_len_);
+			n_, "/livox/imu", 1000);
 #endif
 	}
 	lck.unlock();
-
-	// Send TF:
-	mrpt::poses::CPose3D sensorPose = obs.sensorPose;
-	auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-	Msg_TransformStamped tfStmp;
-	tfStmp.transform = tf2::toMsg(transform);
-	tfStmp.header.frame_id = "base_link";
-	tfStmp.child_frame_id = obs.sensorLabel;
-	tfStmp.header.stamp = myNow();
-
-	Msg_TFMessage tfMsg;
-	tfMsg.transforms.push_back(tfStmp);
-	pubs.pub_tf->publish(tfMsg);
 
 	// Send observation:
 	{
@@ -1242,8 +1157,15 @@ void MVSimNode::internalOn(const mvsim::VehicleBase& veh, const mrpt::obs::CObse
 		Msg_Header msg_header;
 		// Force usage of simulation time:
 		msg_header.stamp = myNow();
-		msg_header.frame_id = obs.sensorLabel;
+		msg_header.frame_id = "livox_frame";
 		mrpt2ros::toROS(obs, msg_header, msg_imu);
+
+		// Normalize linear acceleration from m/s² to g-units:
+		constexpr double GRAVITY = 9.81;
+		msg_imu.linear_acceleration.x /= GRAVITY;
+		msg_imu.linear_acceleration.y /= GRAVITY;
+		msg_imu.linear_acceleration.z /= GRAVITY;
+
 		pub->publish(mvsim_node::make_shared<Msg_Imu>(msg_imu));
 	}
 }
@@ -1274,20 +1196,6 @@ void MVSimNode::internalOn(const mvsim::VehicleBase& veh, const mrpt::obs::CObse
 #endif
 	}
 	lck.unlock();
-
-	// Send TF:
-	mrpt::poses::CPose3D sensorPose = obs.sensorPose;
-	auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-	Msg_TransformStamped tfStmp;
-	tfStmp.transform = tf2::toMsg(transform);
-	tfStmp.header.frame_id = "base_link";
-	tfStmp.child_frame_id = obs.sensorLabel;
-	tfStmp.header.stamp = myNow();
-
-	Msg_TFMessage tfMsg;
-	tfMsg.transforms.push_back(tfStmp);
-	pubs.pub_tf->publish(tfMsg);
 
 	// Send observation:
 	{
@@ -1440,21 +1348,6 @@ void MVSimNode::internalOn(const mvsim::VehicleBase& veh, const mrpt::obs::CObse
 	}
 	lck.unlock();
 
-	// Send TF:
-	mrpt::poses::CPose3D sensorPose;
-	obs.getSensorPose(sensorPose);
-	auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-	Msg_TransformStamped tfStmp;
-	tfStmp.transform = tf2::toMsg(transform);
-	tfStmp.header.frame_id = "base_link";
-	tfStmp.child_frame_id = obs.sensorLabel;
-	tfStmp.header.stamp = myNow();
-
-	Msg_TFMessage tfMsg;
-	tfMsg.transforms.push_back(tfStmp);
-	pubs.pub_tf->publish(tfMsg);
-
 	// Send observation:
 	Msg_Header msg_header;
 	msg_header.stamp = myNow();
@@ -1487,7 +1380,7 @@ void MVSimNode::internalOn(
 	auto lck = mrpt::lockHelper(pubsub_vehicles_mtx_);
 	auto& pubs = pubsub_vehicles_[veh.getVehicleIndex()];
 
-	const auto lbPoints = obs.sensorLabel + "_points"s;
+	const auto lbPoints = "livox_frame";
 	const auto lbImage = obs.sensorLabel + "_rgb/image_raw"s;
 	const auto lbImageCamInfo = obs.sensorLabel + "_rgb/camera_info"s;
 	const auto lbDepthImage = obs.sensorLabel + "_depth/image_raw"s;
@@ -1513,7 +1406,7 @@ void MVSimNode::internalOn(
 		pubImg = mvsim_node::make_shared<PublisherWrapper<Msg_Image>>(
 			n_, vehVarName(lbImage, veh), publisher_history_len_);
 		pubPts = mvsim_node::make_shared<PublisherWrapper<Msg_PointCloud2>>(
-			n_, vehVarName(lbPoints, veh), publisher_history_len_);
+			n_, "/livox/lidar", publisher_history_len_);
 		pubImgCamInfo = mvsim_node::make_shared<PublisherWrapper<Msg_CameraInfo>>(
 			n_, vehVarName(lbImageCamInfo, veh), publisher_history_len_);
 #endif
@@ -1550,20 +1443,6 @@ void MVSimNode::internalOn(
 	// ----------------------------------------------------------------
 	if (obs.hasIntensityImage)
 	{
-		// Send TF:
-		mrpt::poses::CPose3D sensorPose = obs.sensorPose + obs.relativePoseIntensityWRTDepth;
-		auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-		Msg_TransformStamped tfStmp;
-		tfStmp.transform = tf2::toMsg(transform);
-		tfStmp.header.frame_id = "base_link";
-		tfStmp.child_frame_id = lbImage;
-		tfStmp.header.stamp = now;
-
-		Msg_TFMessage tfMsg;
-		tfMsg.transforms.push_back(tfStmp);
-		pubs.pub_tf->publish(tfMsg);
-
 		Msg_Header msg_header;
 		msg_header.stamp = now;
 		msg_header.frame_id = lbImage;
@@ -1588,22 +1467,6 @@ void MVSimNode::internalOn(
 	// ----------------------------------------------------------------
 	if (wantDepthImage && obs.hasRangeImage)
 	{
-		// Send TF for depth frame:
-		{
-			mrpt::poses::CPose3D sensorPose = obs.sensorPose;
-			auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-			Msg_TransformStamped tfStmp;
-			tfStmp.transform = tf2::toMsg(transform);
-			tfStmp.header.frame_id = "base_link";
-			tfStmp.child_frame_id = obs.sensorLabel + "_depth";
-			tfStmp.header.stamp = now;
-
-			Msg_TFMessage tfMsg;
-			tfMsg.transforms.push_back(tfStmp);
-			pubs.pub_tf->publish(tfMsg);
-		}
-
 		Msg_Header msg_header;
 		msg_header.stamp = now;
 		msg_header.frame_id = obs.sensorLabel + "_depth";
@@ -1647,20 +1510,6 @@ void MVSimNode::internalOn(
 	// ----------------------------------------------------------------
 	if (obs.hasRangeImage)
 	{
-		// Send TF:
-		mrpt::poses::CPose3D sensorPose = obs.sensorPose;
-		auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-		Msg_TransformStamped tfStmp;
-		tfStmp.transform = tf2::toMsg(transform);
-		tfStmp.header.frame_id = "base_link";
-		tfStmp.child_frame_id = lbPoints;
-		tfStmp.header.stamp = now;
-
-		Msg_TFMessage tfMsg;
-		tfMsg.transforms.push_back(tfStmp);
-		pubs.pub_tf->publish(tfMsg);
-
 		// Send observation:
 		{
 			Msg_PointCloud2 msg_pts;
@@ -1702,7 +1551,7 @@ void MVSimNode::internalOn(
 	auto lck = mrpt::lockHelper(pubsub_vehicles_mtx_);
 	auto& pubs = pubsub_vehicles_[veh.getVehicleIndex()];
 
-	const auto lbPoints = obs.sensorLabel + "_points"s;
+	const auto lbPoints = "/livox/lidar";
 
 	// Create the publisher the first time an observation arrives:
 	const bool is_1st_pub = pubs.pub_sensors.find(lbPoints) == pubs.pub_sensors.end();
@@ -1726,27 +1575,13 @@ void MVSimNode::internalOn(
 	// POINTS
 	// --------
 
-	// Send TF:
-	mrpt::poses::CPose3D sensorPose = obs.sensorPose;
-	auto transform = mrpt2ros::toROS_tfTransform(sensorPose);
-
-	Msg_TransformStamped tfStmp;
-	tfStmp.transform = tf2::toMsg(transform);
-	tfStmp.header.frame_id = "base_link";
-	tfStmp.child_frame_id = lbPoints;
-	tfStmp.header.stamp = now;
-
-	Msg_TFMessage tfMsg;
-	tfMsg.transforms.push_back(tfStmp);
-	pubs.pub_tf->publish(tfMsg);
-
 	// Send observation:
 	{
 		// Convert observation MRPT -> ROS
 		auto msg_pts = mvsim_node::make_shared<Msg_PointCloud2>();
 		Msg_Header msg_header;
 		msg_header.stamp = now;
-		msg_header.frame_id = lbPoints;
+		msg_header.frame_id = "livox_frame";
 
 #if MRPT_VERSION < 0x020f00	 // 2.15.0 support legacy classes
 		if (auto* xyzirt = dynamic_cast<const mrpt::maps::CPointsMapXYZIRT*>(obs.pointcloud.get());

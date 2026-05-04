@@ -45,14 +45,14 @@ def generate_launch_description():
     ld.add_action(
         DeclareLaunchArgument(
             'do_fake_localization',
-            default_value='True',
+            default_value='False',
             description='Publish fake identity tf "map" -> "odom"'
         )
     )
     ld.add_action(
         DeclareLaunchArgument(
             'publish_tf_odom2baselink',
-            default_value='True',
+            default_value='False',
             description='Publish tf "odom" -> "base_link"'
         )
     )

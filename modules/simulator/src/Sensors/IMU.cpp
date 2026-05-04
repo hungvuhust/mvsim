@@ -130,11 +130,21 @@ void IMU::internal_simulate_imu(const TSimulContext& context)
 
 	const double dt = context.dt;
 
+	// Rotation from vehicle frame to sensor frame (sensor pose relative
+	// to vehicle).  Rs = R(sensorPose), so v_sensor = Rs^T * v_vehicle.
+	const auto Rs = obs_model_.sensorPose.getRotationMatrix();  // 3×3
+
 	// --- Angular velocity ---
 	// Ground-truth: only yaw-rate from the 2D dynamics for now.
-	const mrpt::math::TVector3D trueW(0.0, 0.0, vehicle_.getRefVelocityLocal().omega);
+	const mrpt::math::TVector3D trueWVeh(0.0, 0.0, vehicle_.getRefVelocityLocal().omega);
 
-	const mrpt::math::TVector3D w = noiseModel_.applyGyroscope(trueW, dt);
+	// Rotate from vehicle frame to sensor frame:
+	const mrpt::math::TVector3D trueWSensor(
+		Rs(0, 0) * trueWVeh.x + Rs(1, 0) * trueWVeh.y + Rs(2, 0) * trueWVeh.z,
+		Rs(0, 1) * trueWVeh.x + Rs(1, 1) * trueWVeh.y + Rs(2, 1) * trueWVeh.z,
+		Rs(0, 2) * trueWVeh.x + Rs(1, 2) * trueWVeh.y + Rs(2, 2) * trueWVeh.z);
+
+	const mrpt::math::TVector3D w = noiseModel_.applyGyroscope(trueWSensor, dt);
 
 	outObs->set(mrpt::obs::IMU_WX, w.x);
 	outObs->set(mrpt::obs::IMU_WY, w.y);
@@ -143,21 +153,28 @@ void IMU::internal_simulate_imu(const TSimulContext& context)
 	// --- Linear acceleration ---
 	const auto g = mrpt::math::TVector3D(0.0, 0.0, -world_->get_gravity());
 
-	// Rotate the global-frame acceleration vector into the vehicle's
-	// local frame.
+	// Rotate the global-frame acceleration vector into the sensor's
+	// local frame:  R_global_to_sensor = Rs^T * R_vehicle^T
 	const auto globalAcc = vehicle_.getLinearAcceleration() - g;
-	const auto R = vehicle_.getCPose3D().getRotationMatrix();  // 3×3
+	const auto Rv = vehicle_.getCPose3D().getRotationMatrix();  // 3×3
 
-	const mrpt::math::TVector3D trueAccLocal(
-		R(0, 0) * globalAcc.x + R(1, 0) * globalAcc.y + R(2, 0) * globalAcc.z,
-		R(0, 1) * globalAcc.x + R(1, 1) * globalAcc.y + R(2, 1) * globalAcc.z,
-		R(0, 2) * globalAcc.x + R(1, 2) * globalAcc.y + R(2, 2) * globalAcc.z);
+	// First: global -> vehicle frame
+	const mrpt::math::TVector3D accVeh(
+		Rv(0, 0) * globalAcc.x + Rv(1, 0) * globalAcc.y + Rv(2, 0) * globalAcc.z,
+		Rv(0, 1) * globalAcc.x + Rv(1, 1) * globalAcc.y + Rv(2, 1) * globalAcc.z,
+		Rv(0, 2) * globalAcc.x + Rv(1, 2) * globalAcc.y + Rv(2, 2) * globalAcc.z);
 
-	const mrpt::math::TVector3D linAccLocal = noiseModel_.applyAccelerometer(trueAccLocal, dt);
+	// Then: vehicle frame -> sensor frame
+	const mrpt::math::TVector3D trueAccSensor(
+		Rs(0, 0) * accVeh.x + Rs(1, 0) * accVeh.y + Rs(2, 0) * accVeh.z,
+		Rs(0, 1) * accVeh.x + Rs(1, 1) * accVeh.y + Rs(2, 1) * accVeh.z,
+		Rs(0, 2) * accVeh.x + Rs(1, 2) * accVeh.y + Rs(2, 2) * accVeh.z);
 
-	outObs->set(mrpt::obs::IMU_X_ACC, linAccLocal.x);
-	outObs->set(mrpt::obs::IMU_Y_ACC, linAccLocal.y);
-	outObs->set(mrpt::obs::IMU_Z_ACC, linAccLocal.z);
+	const mrpt::math::TVector3D linAccSensor = noiseModel_.applyAccelerometer(trueAccSensor, dt);
+
+	outObs->set(mrpt::obs::IMU_X_ACC, linAccSensor.x);
+	outObs->set(mrpt::obs::IMU_Y_ACC, linAccSensor.y);
+	outObs->set(mrpt::obs::IMU_Z_ACC, linAccSensor.z);
 
 	// --- Orientation ---
 	if (measure_orientation_)
