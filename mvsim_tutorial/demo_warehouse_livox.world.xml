@@ -110,12 +110,75 @@
 	     ============================= -->
 	<include file="../mvsim_tutorial/jackal_livox.vehicle.xml" lidar2d_raytrace="true" />
 
+	<!-- =============================
+		   Actor classes definition
+	     ============================= -->
+	<actor:class name="pedestrian_man">
+		<walking_speed>0.8</walking_speed>
+		<animation_idle>HumanArmature|Man_Idle</animation_idle>
+		<animation_walk>HumanArmature|Man_Walk</animation_walk>
+		<animation_run>HumanArmature|Man_Run</animation_run>
+		<visual>
+			<model_uri>https://mrpt.github.io/mvsim-models/AnimatedMenCharacters.zip/FBX/Male_Casual.fbx</model_uri>
+			<model_scale>0.0027</model_scale>
+			<model_roll>90.0</model_roll>
+		</visual>
+	</actor:class>
+
+	<actor:class name="pedestrian_woman">
+		<walking_speed>0.7</walking_speed>
+		<animation_idle>HumanArmature|Man_Idle</animation_idle>
+		<animation_walk>HumanArmature|Man_Walk</animation_walk>
+		<animation_run>HumanArmature|Man_Run</animation_run>
+		<visual>
+			<model_uri>https://mrpt.github.io/mvsim-models/AnimatedWomenCharacters.zip/FBX/Female_Casual.fbx</model_uri>
+			<model_scale>0.0027</model_scale>
+			<model_roll>90.0</model_roll>
+		</visual>
+	</actor:class>
+
 	<!-- ========================
 		   Vehicle(s) definition
 	     ======================== -->
 	<vehicle name="r1" class="jackal_livox">
 		<init_pose>0 0 0</init_pose>		<!-- In global coords: x,y, yaw(deg) -->
 	</vehicle>
+
+	<!-- ========================
+		   Actor(s) definition
+	     ======================== -->
+	<actor name="p1" class="pedestrian_man">
+		<init_pose>-4.5 -3.75 0</init_pose>
+		<path loop="true">
+			<waypoint>-4.5 -3.75 0</waypoint>
+			<waypoint>-4.5 3.75 0</waypoint>
+			<waypoint pause="1.0">-4.5 3.75 180</waypoint>
+			<waypoint>-4.5 -3.75 180</waypoint>
+			<waypoint pause="1.0">-4.5 -3.75 0</waypoint>
+		</path>
+	</actor>
+
+	<actor name="p2" class="pedestrian_woman">
+		<init_pose>0 3.6 180</init_pose>
+		<path loop="true">
+			<waypoint>-6.5 -3.75 180</waypoint>
+			<waypoint>-0 3.6 180</waypoint>
+			<waypoint pause="1.0">0 3.6 0</waypoint>
+			<waypoint>-6.5 -3.75 0</waypoint>
+			<waypoint pause="1.0">-6.5 -3.75 180</waypoint>
+		</path>
+	</actor>
+
+	<actor name="p3" class="pedestrian_man">
+		<init_pose>-11.5 10 0</init_pose>
+		<path loop="true">
+			<waypoint>-11.5 10 0</waypoint>
+			<waypoint>-10.5 -8.0 0</waypoint>
+			<waypoint pause="2.0">-10.5 -8.0 180</waypoint>
+			<waypoint>-11.5 10 180</waypoint>
+			<waypoint pause="2.0">-11.5 10 0</waypoint>
+		</path>
+	</actor>
 
 	<!-- ======================================
 	      Object types

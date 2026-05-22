@@ -781,7 +781,7 @@ void MVSimNode::onROSMsgCmdVel(Msg_Twist_CSPtr cmd, mvsim::VehicleBase* veh)
 	lastCmdVelTimestamp_[veh] = myNowSec();
 
 	const bool ctrlAcceptTwist =
-		controller->setTwistCommand({cmd->linear.x, cmd->linear.y, cmd->angular.z});
+		controller->setTwistCommand({-cmd->linear.x, cmd->linear.y, cmd->angular.z});
 
 	if (!ctrlAcceptTwist)
 	{

@@ -94,11 +94,11 @@ def generate_launch_description():
         parameters=[{
             'axis_linear.x': 1,
             'axis_angular.yaw': 0,
-            'scale_linear.x': -1.0,
+            'scale_linear.x': 1.0,
             'scale_angular.yaw': 1.0,
             'enable_button': 6,
             'enable_turbo_button': 5,
-            'scale_linear_turbo.x': -2.0,
+            'scale_linear_turbo.x': 2.0,
             'scale_angular_turbo.yaw': 2.0,
         }],
         remappings=[
