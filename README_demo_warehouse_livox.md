@@ -80,15 +80,15 @@ ros2 launch mvsim demo_warehouse_livox.launch.py headless:=True
 | Topic | Type | Description |
 |---|---|---|
 | `/cmd_vel` | `geometry_msgs/Twist` | Robot velocity command |
-| `/livox/lidar` | `sensor_msgs/PointCloud2` | Livox LiDAR pointcloud |
-| `/livox/imu` | `sensor_msgs/Imu` | IMU data |
+| `/sensors/lidar/mid360_front/pointcloud` | `sensor_msgs/PointCloud2` | Livox LiDAR pointcloud |
+| `/sensors/lidar/mid360_front/imu` | `sensor_msgs/Imu` | IMU data |
 
 ---
 
 ## TF Frames
 
 ```
-map → odom → base_link → livox_frame
+map → odom → base_link → mid360_front
 ```
 
-Static TF `base_link → livox_frame`: offset `(-0.07, 0, 0.337)`, rotated 180° around Y.
+Static TF `base_link → mid360_front`: offset `(-0.07, 0, 0.337)`, rotated 180° around Y.

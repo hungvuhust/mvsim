@@ -17,7 +17,7 @@ class TopicRemapper(Node):
         )
         self.imu_pub = self.create_publisher(
             Imu,
-            '/livox/imu',
+            '/sensors/lidar/mid360_front/imu',
             10
         )
         
@@ -30,11 +30,11 @@ class TopicRemapper(Node):
         )
         self.lidar_pub = self.create_publisher(
             PointCloud2,
-            '/livox/lidar',
+            '/sensors/lidar/mid360_front/pointcloud',
             10
         )
-        
-        self.get_logger().info('Topic remapper started: /imu -> /livox/imu, /lidar_points -> /livox/lidar')
+
+        self.get_logger().info('Topic remapper started: /imu -> /sensors/lidar/mid360_front/imu, /lidar_points -> /sensors/lidar/mid360_front/pointcloud')
     
     def imu_callback(self, msg):
         self.imu_pub.publish(msg)

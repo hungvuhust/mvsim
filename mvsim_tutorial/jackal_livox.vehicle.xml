@@ -63,7 +63,7 @@
   </visual>
 
   <!-- Sensors: chỉ có pointcloud và IMU -->
-  <!-- Pointcloud sensor (Livox lidar) - đặt tại vị trí livox_frame -->
+  <!-- Pointcloud sensor (Livox lidar) - đặt tại vị trí mid360_front -->
   <include file="../mvsim_tutorial/livox_lidar.sensor.xml" sensor_x="-0.07" sensor_y="0.0" sensor_z="1.3" sensor_yaw="0" sensor_pitch="180.0" sensor_roll="0" sensor_std_noise="0.0025" sensor_publish="false" sensor_name="lidar" sensor_rate="10.0" generate_intensity="true" horz_resolution_factor="1.5" vert_resolution_factor="1.0" />
 
   <!-- IMU sensor - offset từ lidar theo T_lidar_imu=[0.006,-0.012,0.008] (converted to base_link frame) -->

@@ -8,16 +8,16 @@ import math
 
 class LivoxFramePublisher(Node):
     def __init__(self):
-        super().__init__('livox_frame_publisher')
-        
+        super().__init__('mid360_front_frame_publisher')
+
         # Create static transform broadcaster
         self.broadcaster = StaticTransformBroadcaster(self)
-        
-        # Create transform from base_link to livox_frame
+
+        # Create transform from base_link to mid360_front
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = "base_link"
-        transform.child_frame_id = "livox_frame"
+        transform.child_frame_id = "mid360_front"
         
         # Set translation (sensor position: x=0.15, z=0.35 from vehicle config)
         transform.transform.translation.x = 0.15
@@ -33,7 +33,7 @@ class LivoxFramePublisher(Node):
         # Send the transform
         self.broadcaster.sendTransform(transform)
         
-        self.get_logger().info('Published static transform: base_link -> livox_frame')
+        self.get_logger().info('Published static transform: base_link -> mid360_front')
         
         # Keep node alive
         # The transform is static, so we don't need to publish it repeatedly

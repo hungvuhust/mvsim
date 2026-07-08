@@ -72,9 +72,9 @@ def generate_launch_description():
     static_tf_base_to_livox = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='static_tf_base_link_to_livox_frame',
+        name='static_tf_base_link_to_mid360_front',
         arguments=['-0.07', '0', '0.337', '0',
-                   '0', '3.14159265', 'base_link', 'livox_frame']
+                   '0', '3.14159265', 'base_link', 'mid360_front']
     )
 
     joy_node = Node(

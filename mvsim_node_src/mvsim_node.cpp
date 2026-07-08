@@ -770,7 +770,6 @@ void MVSimNode::initPubSubs(TPubSubPerVehicle& pubsubs, mvsim::VehicleBase* veh)
 			n_->create_publisher<Msg_PoseArray>(vehVarName("particlecloud", *veh), 1);
 #endif
 	}
-
 }
 
 void MVSimNode::onROSMsgCmdVel(Msg_Twist_CSPtr cmd, mvsim::VehicleBase* veh)
@@ -1145,7 +1144,7 @@ void MVSimNode::internalOn(const mvsim::VehicleBase& veh, const mrpt::obs::CObse
 			n_.advertise<Msg_Imu>(vehVarName(obs.sensorLabel, veh), publisher_history_len_));
 #else
 		pub = mvsim_node::make_shared<PublisherWrapper<Msg_Imu>>(
-			n_, "/livox/imu", 1000);
+			n_, "/sensors/lidar/mid360_front/imu", 1000);
 #endif
 	}
 	lck.unlock();
@@ -1157,14 +1156,10 @@ void MVSimNode::internalOn(const mvsim::VehicleBase& veh, const mrpt::obs::CObse
 		Msg_Header msg_header;
 		// Force usage of simulation time:
 		msg_header.stamp = myNow();
-		msg_header.frame_id = "livox_frame";
+		msg_header.frame_id = "mid360_front";
 		mrpt2ros::toROS(obs, msg_header, msg_imu);
 
-		// Normalize linear acceleration from m/s² to g-units:
-		constexpr double GRAVITY = 9.81;
-		msg_imu.linear_acceleration.x /= GRAVITY;
-		msg_imu.linear_acceleration.y /= GRAVITY;
-		msg_imu.linear_acceleration.z /= GRAVITY;
+		// Linear acceleration is kept in m/s² (SI units).
 
 		pub->publish(mvsim_node::make_shared<Msg_Imu>(msg_imu));
 	}
@@ -1380,7 +1375,7 @@ void MVSimNode::internalOn(
 	auto lck = mrpt::lockHelper(pubsub_vehicles_mtx_);
 	auto& pubs = pubsub_vehicles_[veh.getVehicleIndex()];
 
-	const auto lbPoints = "livox_frame";
+	const auto lbPoints = "mid360_front";
 	const auto lbImage = obs.sensorLabel + "_rgb/image_raw"s;
 	const auto lbImageCamInfo = obs.sensorLabel + "_rgb/camera_info"s;
 	const auto lbDepthImage = obs.sensorLabel + "_depth/image_raw"s;
@@ -1406,7 +1401,7 @@ void MVSimNode::internalOn(
 		pubImg = mvsim_node::make_shared<PublisherWrapper<Msg_Image>>(
 			n_, vehVarName(lbImage, veh), publisher_history_len_);
 		pubPts = mvsim_node::make_shared<PublisherWrapper<Msg_PointCloud2>>(
-			n_, "/livox/lidar", publisher_history_len_);
+			n_, "/sensors/lidar/mid360_front/pointcloud", publisher_history_len_);
 		pubImgCamInfo = mvsim_node::make_shared<PublisherWrapper<Msg_CameraInfo>>(
 			n_, vehVarName(lbImageCamInfo, veh), publisher_history_len_);
 #endif
@@ -1551,7 +1546,7 @@ void MVSimNode::internalOn(
 	auto lck = mrpt::lockHelper(pubsub_vehicles_mtx_);
 	auto& pubs = pubsub_vehicles_[veh.getVehicleIndex()];
 
-	const auto lbPoints = "/livox/lidar";
+	const auto lbPoints = "/sensors/lidar/mid360_front/pointcloud";
 
 	// Create the publisher the first time an observation arrives:
 	const bool is_1st_pub = pubs.pub_sensors.find(lbPoints) == pubs.pub_sensors.end();
@@ -1581,7 +1576,7 @@ void MVSimNode::internalOn(
 		auto msg_pts = mvsim_node::make_shared<Msg_PointCloud2>();
 		Msg_Header msg_header;
 		msg_header.stamp = now;
-		msg_header.frame_id = "livox_frame";
+		msg_header.frame_id = "mid360_front";
 
 #if MRPT_VERSION < 0x020f00	 // 2.15.0 support legacy classes
 		if (auto* xyzirt = dynamic_cast<const mrpt::maps::CPointsMapXYZIRT*>(obs.pointcloud.get());
